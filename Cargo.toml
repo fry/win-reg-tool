@@ -1,0 +1,11 @@
+[package]
+name = "win-reg-tool"
+version = "0.1.0"
+authors = ["Eike Siewertsen <eike@allv.is>"]
+edition = "2018"
+
+[dependencies]
+log = "0.4.0"
+env_logger = "0.6.0"
+winreg = "0.6"
+clap = "2.32.0"
