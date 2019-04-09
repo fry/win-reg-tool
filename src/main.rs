@@ -94,8 +94,6 @@ fn reg_create_all_users(subkey: &OsStr, name: &OsStr, value: &OsStr) -> io::Resu
                     io::stdout().write_all(&output.stdout).unwrap();
                     io::stdout().write_all(&output.stderr).unwrap();
                     std::thread::sleep(std::time::Duration::from_millis(1000));
-                } else {
-                    break;
                 }
             }
         }
