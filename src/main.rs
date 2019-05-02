@@ -15,7 +15,7 @@ use clap::{clap_app, crate_authors, crate_version, AppSettings};
 
 static LOAD_KEY: &str = "_LoadedProfile";
 
-fn reg_create_all_users(subkey: &OsStr, name: &OsStr, value: &OsStr) -> io::Result<()> {
+fn reg_all_users<F>(apply: F) -> io::Result<()> where F : Fn(RegKey) -> io::Result<()> {
     let hive_path = format!(r"HKU\{}", LOAD_KEY);
 
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
@@ -67,16 +67,7 @@ fn reg_create_all_users(subkey: &OsStr, name: &OsStr, value: &OsStr) -> io::Resu
                     }
                 };
 
-                info!(
-                    "Writing value {}\\{}",
-                    subkey.to_string_lossy(),
-                    name.to_string_lossy()
-                );
-                let (proofing_key, _) = load_key.create_subkey(subkey)?;
-
-                proofing_key
-                    .set_value(&name, &value)
-                    .expect("setting value to succeed");
+                apply(load_key)?;
             }
 
             // Unload registry hive if we loaded it
@@ -102,6 +93,35 @@ fn reg_create_all_users(subkey: &OsStr, name: &OsStr, value: &OsStr) -> io::Resu
     Ok(())
 }
 
+fn reg_create_all_users(subkey: &OsStr, name: &OsStr, value: &OsStr) -> io::Result<()> {
+    reg_all_users(|load_key| {
+        info!(
+            "Writing value {}\\{}",
+            subkey.to_string_lossy(),
+            name.to_string_lossy()
+        );
+
+        let (key, _) = load_key.create_subkey(subkey)?;
+        key
+            .set_value(&name, &value)
+            .expect("setting value to succeed");
+        
+        Ok(())
+    })
+}
+
+
+fn reg_delete_key_all_users(subkey: &OsStr) -> io::Result<()> {
+    reg_all_users(|load_key| {
+        info!(
+            "Deleting key {}",
+            subkey.to_string_lossy()
+        );
+
+        load_key.delete_subkey_all(subkey)
+    })
+}
+
 fn main() -> io::Result<()> {
     env_logger::init();
 
@@ -110,6 +130,10 @@ fn main() -> io::Result<()> {
 		(author: crate_authors!())
         (about: "Helps dealing with the Windows registry")
         (setting: AppSettings::SubcommandRequiredElseHelp)
+        (@subcommand all_users_delete_key =>
+            (about: "Delete a registry key for all users on the system by loading their corresponding registry hive")
+            (@arg SUB_KEY: -k --key +required +takes_value "The subkey to delete")
+        )
         (@subcommand all_users =>
             (about: "Set a registry value for all users on the system by loading their corresponding registry hive")
             (@arg SUB_KEY: -k --key +required +takes_value "The subkey to set a value in")
@@ -125,6 +149,11 @@ fn main() -> io::Result<()> {
             let value = matches.value_of_os("VALUE").expect("value to bet set");
 
             return reg_create_all_users(subkey, name, value);
+        }
+        ("all_users_delete_key", Some(matches)) => {
+            let subkey = matches.value_of_os("SUB_KEY").expect("sub key to be set");
+
+            return reg_delete_key_all_users(subkey);
         }
         _ => eprintln!("Invalid subcommand"),
     }
