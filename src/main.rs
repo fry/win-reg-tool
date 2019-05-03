@@ -110,7 +110,6 @@ fn reg_create_all_users(subkey: &OsStr, name: &OsStr, value: &OsStr) -> io::Resu
     })
 }
 
-
 fn reg_delete_key_all_users(subkey: &OsStr) -> io::Result<()> {
     reg_all_users(|load_key| {
         info!(
@@ -118,7 +117,29 @@ fn reg_delete_key_all_users(subkey: &OsStr) -> io::Result<()> {
             subkey.to_string_lossy()
         );
 
-        load_key.delete_subkey_all(subkey)
+        if let Err(e) = load_key.delete_subkey_all(subkey) {
+            error!("Failed to delete: {}", e);
+        }
+
+        Ok(())
+    })
+}
+
+
+fn reg_delete_value_all_users(subkey: &OsStr, name: &OsStr) -> io::Result<()> {
+    reg_all_users(|load_key| {
+        info!(
+            "Deleting value {}\\{}",
+            subkey.to_string_lossy(),
+            name.to_string_lossy()
+        );
+
+        let key = load_key.open_subkey_with_flags(subkey, KEY_WRITE)?;
+        if let Err(e) = key.delete_value(&name) {
+            error!("Failed to delete: {}", e);
+        }
+        
+        Ok(())
     })
 }
 
@@ -133,6 +154,11 @@ fn main() -> io::Result<()> {
         (@subcommand all_users_delete_key =>
             (about: "Delete a registry key for all users on the system by loading their corresponding registry hive")
             (@arg SUB_KEY: -k --key +required +takes_value "The subkey to delete")
+        )
+        (@subcommand all_users_delete_value =>
+            (about: "Delete a registry value for all users on the system by loading their corresponding registry hive")
+            (@arg SUB_KEY: -k --key +required +takes_value "The subkey to delete")
+            (@arg NAME: -n --name +required +takes_value "Name of the value to set")
         )
         (@subcommand all_users =>
             (about: "Set a registry value for all users on the system by loading their corresponding registry hive")
@@ -149,6 +175,12 @@ fn main() -> io::Result<()> {
             let value = matches.value_of_os("VALUE").expect("value to bet set");
 
             return reg_create_all_users(subkey, name, value);
+        }
+        ("all_users_delete_value", Some(matches)) => {
+            let subkey = matches.value_of_os("SUB_KEY").expect("sub key to be set");
+            let name = matches.value_of_os("NAME").expect("name to be set");
+
+            return reg_delete_value_all_users(subkey, name);
         }
         ("all_users_delete_key", Some(matches)) => {
             let subkey = matches.value_of_os("SUB_KEY").expect("sub key to be set");
